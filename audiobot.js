@@ -1,9 +1,8 @@
 require('dotenv').config();
-let exec = require('child_process').exec;
+const { spawn } = require('child_process');
 const {RTMClient, WebClient} = require('@slack/client');
 let fs = require('fs');
-let os = require('os');
-let platform = os.platform();
+let platform = require('os').platform();
 
 const SUPPORTED_FORMATS = ['.mp3', '.wav'];
 
@@ -47,6 +46,8 @@ const isDirect = function (userId, messageText) {
         messageText.substr(0, userTag.length) === userTag;
 };
 
+let sounds = [];
+
 rtm.on('message', event => {
     // Check if we should handle this message
     if ((event.subtype && 'bot_message' === event.subtype) ||
@@ -80,6 +81,11 @@ rtm.on('message', event => {
         listening = false;
         rtm.sendMessage('I stopped listening.', channel);
         return;
+    }
+
+    // Handle telling bot to stop all sounds
+    if (trimmedMessage === 'mute') {
+        sounds.forEach(s => {s.kill()});
     }
 
     // Spit out a list of valid sounds that bot can play
@@ -116,7 +122,7 @@ rtm.on('message', event => {
         return;
     }
 
-    let player = (process.env.player || 'mplayer') + ' ';
+    let player = (process.env.player || 'mplayer');
 
     let outputDevice = '';
     //pick output device 1 = headphones, 2 = speakers (default) - windows only
@@ -155,7 +161,15 @@ rtm.on('message', event => {
     SUPPORTED_FORMATS.every(extension => {
         try {
             fs.accessSync(soundToPlay + extension, fs.constants.R_OK);
-            exec(player + outputDevice + ' ' + soundToPlay + extension);
+            console.log(player, [outputDevice, soundToPlay + extension]);
+            const sound = spawn(player, [outputDevice, soundToPlay + extension]);
+
+            sound.on('error', err => {
+                console.log('ERROR: ' + err);
+            });
+
+            sounds.push(sound);
+
             console.log('playing: ' + soundToPlay + extension);
             return false;
         } catch (e) {
