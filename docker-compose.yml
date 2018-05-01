@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  audiobot:
+    build: .
+    privileged: true
+    volumes:
+      - ${HOST_DEV_SOUND:-/dev/snd}:/dev/snd
+      - ${SRC}:/home/node/slack-audiobot
+    command: tail -f /dev/null
