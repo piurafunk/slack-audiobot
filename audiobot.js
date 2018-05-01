@@ -13,7 +13,7 @@ rtm.start();
 const web = new WebClient(process.env.TOKEN);
 web.channels.list()
     .then(res => {
-        const channels = res.channels.find(c => c.is_member) || [];
+        const channels = (res.channels.filter(c => c.is_member) || []).map(c => c.name) || [];
 
         if (channels.length > 0) {
             console.log('You are in the following public channels: ' + channels.join(', ') + '.');
@@ -24,14 +24,28 @@ web.channels.list()
 
 web.groups.list()
     .then(res => {
-        const groups = res.groups.find(g => g.is_member && !g.is_archived) || [];
+        const groups = (res.groups.filter(g => g.is_member && !g.is_archived) || []).map(g => g.name) || [];
 
         if (groups.length > 0) {
             console.log('You are in the following private channels: ' + groups.join(', ') + '.');
         } else {
             console.log('You are not in any private channels.');
         }
+    })
+    .catch(err => {
+        console.log(err);
     });
+
+const makeMention = function (userId) {
+    return '<@' + userId + '>';
+};
+
+const isDirect = function (userId, messageText) {
+    let userTag = makeMention(userId);
+    return messageText &&
+        messageText.length >= userTag.length &&
+        messageText.substr(0, userTag.length) === userTag;
+};
 
 rtm.on('message', event => {
     // Check if we should handle this message
@@ -50,57 +64,21 @@ rtm.on('message', event => {
     }
 
     let channel = event.channel;
-    let user = event.user;
-
-    let player = (process.env.player || 'mplayer') + ' ';
-
-    let outputDevice = '';
-    //pick output device 1 = headphones, 2 = speakers (default) - windows only
-    if (platform === 'win32') {
-        player = 'mplayer ';
-        let hasTest = event.text.indexOf("test");
-        if (hasTest > -1) {
-            //test was included, so play through device 1 (headphones)
-            outputDevice = '-ao dsound:device=1 ';
-        } else {
-            //test not included so play through device 2 (speakers)
-            outputDevice = '-ao dsound:device=2 ';
-        }
-    }
-
-    // If it's a play trigger, play the sound
-    if (event.text.indexOf('play') > -1 && listening) {
-        //if message has the word play in then try and play a message
-        let soundToPlay = 'sounds/' + event.text.substring(event.text.indexOf('play') + 5);
-
-        SUPPORTED_FORMATS.every(extension => {
-            try {
-                fs.accessSync(soundToPlay + extension, fs.constants.R_OK);
-                exec(player + outputDevice + ' ' + soundToPlay + extension);
-                console.log('playing: ' + soundToPlay + extension);
-                return false;
-            } catch (e) {
-                return true;
-            }
-        });
-
-        return;
-    }
 
     // Trim the message
     let trimmedMessage = event.text.substr(makeMention(rtm.activeUserId).length).trim();
 
     // Handle telling bot to start listening
     if (trimmedMessage === 'start' || trimmedMessage === ': start') {
-        channel.send('I am now listening.');
         listening = true;
+        rtm.sendMessage('I am now listening.', channel);
         return;
     }
 
     // Handle telling bot to stop listening
     if (trimmedMessage === 'stop' || trimmedMessage === ': stop') {
-        channel.send('I stopped listening.');
         listening = false;
+        rtm.sendMessage('I stopped listening.', channel);
         return;
     }
 
@@ -120,17 +98,38 @@ rtm.on('message', event => {
             }
         });
 
-        channel.send('@' + user.name + ' Valid sounds are: ' + soundFiles.join(', '));
+        rtm.sendMessage('@' + event.user.name + ' Valid sounds are: ' + soundFiles.join(', '), channel);
 
         return;
     }
 
     //spit out a list of help commands
     if (trimmedMessage === 'help') {
-        channel.send('Type _play_ and then a valid sound name to make me play that sound\n' +
-            'For a list of valid sound names, type _@' + slack.self.name + ' list_ (I\'ll listen for this even when stopped)\n' +
-            'To stop me listening for play events,  type  _@' + slack.self.name + ' stop_\n' +
-            'To start me listening for play events,  type  _@' + slack.self.name + ' start_ (I\'m _on_ by default)\n');
+        rtm.sendMessage('Type _@audiobot_ and then a valid sound name to make me play that sound\n' +
+            'For a list of valid sound names, type _@audiobot list_ (I\'ll listen for this even when stopped)\n' +
+            'To stop me listening for play events,  type  _@audiobot stop_\n' +
+            'To start me listening for play events,  type  _@audiobot start_ (I\'m _on_ by default)\n', channel);
+        return;
+    }
+
+    if (!listening) {
+        return;
+    }
+
+    let player = (process.env.player || 'mplayer') + ' ';
+
+    let outputDevice = '';
+    //pick output device 1 = headphones, 2 = speakers (default) - windows only
+    if (platform === 'win32') {
+        player = 'mplayer ';
+        let hasTest = event.text.indexOf("test");
+        if (hasTest > -1) {
+            //test was included, so play through device 1 (headphones)
+            outputDevice = '-ao dsound:device=1 ';
+        } else {
+            //test not included so play through device 2 (speakers)
+            outputDevice = '-ao dsound:device=2 ';
+        }
     }
 
     //TTS - use winsay if on windows, else use say CLI for mac
@@ -145,19 +144,25 @@ rtm.on('message', event => {
         } else {
             exec('say ' + toSpeak);
         }
+
+        return;
     }
+
+    // Default to playing a sound
+
+    let soundToPlay = 'sounds/' + event.text.split(' ').splice(1).join(' ');
+
+    SUPPORTED_FORMATS.every(extension => {
+        try {
+            fs.accessSync(soundToPlay + extension, fs.constants.R_OK);
+            exec(player + outputDevice + ' ' + soundToPlay + extension);
+            console.log('playing: ' + soundToPlay + extension);
+            return false;
+        } catch (e) {
+            return true;
+        }
+    });
 });
 
 let listening = true;
 console.log("I'm listening now!");
-
-const makeMention = function (userId) {
-    return '<@' + userId + '>';
-};
-
-const isDirect = function (userId, messageText) {
-    let userTag = makeMention(userId);
-    return messageText &&
-        messageText.length >= userTag.length &&
-        messageText.substr(0, userTag.length) === userTag;
-};
