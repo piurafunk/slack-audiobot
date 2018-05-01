@@ -161,7 +161,6 @@ rtm.on('message', event => {
     SUPPORTED_FORMATS.every(extension => {
         try {
             fs.accessSync(soundToPlay + extension, fs.constants.R_OK);
-            console.log(player, [outputDevice, soundToPlay + extension]);
             const sound = spawn(player, [outputDevice, soundToPlay + extension]);
 
             sound.on('error', err => {
