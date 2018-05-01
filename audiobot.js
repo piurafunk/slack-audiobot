@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { spawn } = require('child_process');
 const {RTMClient, WebClient} = require('@slack/client');
-let fs = require('fs');
+let { lstatSync, readdirSync, accessSync, constants } = require('fs');
 let platform = require('os').platform();
 
 const SUPPORTED_FORMATS = ['.mp3', '.wav'];
@@ -35,15 +35,38 @@ web.groups.list()
         console.log(err);
     });
 
-const makeMention = function (userId) {
+const makeMention = (userId) => {
     return '<@' + userId + '>';
 };
 
-const isDirect = function (userId, messageText) {
+const isDirect = (userId, messageText) => {
     let userTag = makeMention(userId);
     return messageText &&
         messageText.length >= userTag.length &&
         messageText.substr(0, userTag.length) === userTag;
+};
+
+const listDirectory = (dir) => {
+    dir = 'sounds/' + (dir || '');
+
+    let files = readdirSync(dir);
+
+    let directories = files.filter(file => lstatSync(dir + '/' + file).isDirectory());
+
+    let soundFiles = [];
+
+    files.forEach(fileInfo => {
+        fileInfo = fileInfo.split('.').reverse();
+
+        const fileExtension = '.' + fileInfo[0];
+        const fileName = fileInfo.splice(1, 1)[0];
+
+        if (SUPPORTED_FORMATS.indexOf(fileExtension) > -1) {
+            soundFiles.push(fileName);
+        }
+    });
+
+    return {directories: directories, files: soundFiles};
 };
 
 let sounds = [];
@@ -89,22 +112,12 @@ rtm.on('message', event => {
     }
 
     // Spit out a list of valid sounds that bot can play
-    if ((trimmedMessage === 'list' || trimmedMessage === ': list') && (listening === true)) {
-        let files = fs.readdirSync('sounds/');
-        let soundFiles = [];
+    if ((trimmedMessage.split(' ')[0] === 'list' || trimmedMessage === ': list') && (listening === true)) {
+        let contents = listDirectory(trimmedMessage.split(' ')[1] || 'sounds');
 
-        files.forEach(fileInfo => {
-            fileInfo = fileInfo.split('.').reverse();
+        let output = 'Directories:\n\t' + contents.directories.join('\n\t') + "\n" + 'Files:\n\t' + contents.files.join('\n\t');
 
-            const fileExtension = '.' + fileInfo[0];
-            const fileName = fileInfo.splice(1, 1)[0];
-
-            if (SUPPORTED_FORMATS.indexOf(fileExtension) > -1) {
-                soundFiles.push(fileName);
-            }
-        });
-
-        rtm.sendMessage('@' + event.user.name + ' Valid sounds are: ' + soundFiles.join(', '), channel);
+        rtm.sendMessage(output, channel);
 
         return;
     }
@@ -161,7 +174,7 @@ rtm.on('message', event => {
 
     SUPPORTED_FORMATS.every(extension => {
         try {
-            fs.accessSync(soundToPlay + extension, fs.constants.R_OK);
+            accessSync(soundToPlay + extension, constants.R_OK);
             const sound = spawn(player, [outputDevice, soundToPlay + extension]);
 
             sounds.push(sound);
