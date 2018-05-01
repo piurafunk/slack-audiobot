@@ -111,10 +111,11 @@ rtm.on('message', event => {
 
     //spit out a list of help commands
     if (trimmedMessage === 'help') {
-        rtm.sendMessage('Type _@audiobot_ and then a valid sound name to make me play that sound\n' +
-            'For a list of valid sound names, type _@audiobot list_ (I\'ll listen for this even when stopped)\n' +
-            'To stop me listening for play events,  type  _@audiobot stop_\n' +
-            'To start me listening for play events,  type  _@audiobot start_ (I\'m _on_ by default)\n', channel);
+        rtm.sendMessage(`Type _<@${rtm.activeUserId}>_ and then a valid sound name to make me play that sound\n` +
+            `For a list of valid sound names, type _@<@${rtm.activeUserId}> list_ (I'll listen for this even when stopped)\n` +
+            `To stop me listening for play events,  type  _@<@${rtm.activeUserId}> stop_\n` +
+            `To start me listening for play events,  type  _@<@${rtm.activeUserId}> start_ (I'm _on_ by default)\n` +
+            `To mute currently playing sounds, type _<@<@${rtm.activeUserId}>> mute_`, channel);
         return;
     }
 
@@ -163,11 +164,15 @@ rtm.on('message', event => {
             fs.accessSync(soundToPlay + extension, fs.constants.R_OK);
             const sound = spawn(player, [outputDevice, soundToPlay + extension]);
 
+            sounds.push(sound);
+
             sound.on('error', err => {
                 console.log('ERROR: ' + err);
             });
 
-            sounds.push(sound);
+            sound.on('close', () => {
+                sounds.splice(sounds.findIndex(s => s.pid === sound.pid));
+            });
 
             console.log('playing: ' + soundToPlay + extension);
             return false;
