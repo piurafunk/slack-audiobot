@@ -113,7 +113,7 @@ rtm.on('message', event => {
 
     // Spit out a list of valid sounds that bot can play
     if ((trimmedMessage.split(' ')[0] === 'list' || trimmedMessage === ': list') && (listening === true)) {
-        let contents = listDirectory(trimmedMessage.split(' ')[1] || 'sounds');
+        let contents = listDirectory(trimmedMessage.split(' ')[1] || '');
 
         let output = 'Directories:\n\t' + contents.directories.join('\n\t') + "\n" + 'Files:\n\t' + contents.files.join('\n\t');
 
