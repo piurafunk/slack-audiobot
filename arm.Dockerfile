@@ -10,6 +10,7 @@ USER node
 
 RUN cd \
     && git clone https://github.com/piurafunk/slack-audiobot.git \
+    && cd slack-audiobot \
     && npm install
 
 WORKDIR /home/node/slack-audiobot
