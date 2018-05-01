@@ -8,9 +8,9 @@ RUN apt update \
 
 USER node
 
-RUN cd \
-    && git clone https://github.com/piurafunk/slack-audiobot.git \
-    && cd slack-audiobot \
+ADD --chown=node:node package.json package-lock.json audiobot.js sounds /home/node/slack-audiobot/
+
+RUN cd ~/slack-audiobot\
     && npm install
 
 WORKDIR /home/node/slack-audiobot
