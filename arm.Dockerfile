@@ -1,9 +1,10 @@
 FROM arm32v7/node
 
 RUN apt update \
-    && apt install mplayer -y \
-    && apt clean \
-    && rm -rf /var/cache/apt/archives/
+    && apt install mplayer espeak -y \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/ \
+    && usermod -aG audio node
 
 USER node
 
