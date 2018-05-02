@@ -1,12 +1,30 @@
 {
-    "name": "slack-audiobot",
-    "version": "0.1.0",
-    "description": "A slack audio feedback bot",
-    "dependencies": {
-        "@google-cloud/text-to-speech": "^0.1.0",
-        "@slack/client": "^4.2.0",
-        "dotenv": "^5.0.1",
-        "fs": "",
-        "winsay": "0.0.5"
-    }
+  "name": "slack-audiobot",
+  "version": "0.1.0",
+  "description": "A slack audio feedback bot",
+  "dependencies": {
+    "@slack/client": "^4.2.0",
+    "axios": "^0.18.0",
+    "baudio": "^2.1.2",
+    "dotenv": "^5.0.1",
+    "fs": "*",
+    "play-sound": "^1.1.2",
+    "winsay": "0.0.5"
+  },
+  "main": "audiobot.js",
+  "devDependencies": {},
+  "scripts": {
+    "dev": "babel test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/piurafunk/slack-audiobot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/piurafunk/slack-audiobot/issues"
+  },
+  "homepage": "https://github.com/piurafunk/slack-audiobot#readme"
 }

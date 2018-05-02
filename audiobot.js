@@ -1,12 +1,12 @@
 require('dotenv').config();
-const { spawn } = require('child_process');
-const { RTMClient, WebClient } = require('@slack/client');
-let { lstatSync, readdirSync, accessSync, constants } = require('fs');
-let platform = require('os').platform();
+const {spawn} = require('child_process');
+const {RTMClient, WebClient} = require('@slack/client');
+const {lstatSync, readdirSync, accessSync, constants, writeFileSync} = require('fs');
+const platform = require('os').platform();
 
 const SUPPORTED_FORMATS = ['.mp3', '.wav'];
 
-const ttsDriver = process.env.TTS_DRIVER; 
+const ttsDriver = process.env.TTS_DRIVER;
 
 const rtm = new RTMClient(process.env.TOKEN);
 rtm.start();
@@ -68,7 +68,31 @@ const listDirectory = (dir) => {
         }
     });
 
-    return { directories: directories, files: soundFiles };
+    return {directories: directories, files: soundFiles};
+};
+
+const playFile = (file, player, outputDevice) => {
+    SUPPORTED_FORMATS.every(extension => {
+        try {
+            accessSync(file + extension, constants.R_OK);
+            const sound = spawn(player, [outputDevice, file + extension]);
+
+            sounds.push(sound);
+
+            sound.on('error', err => {
+                console.log('ERROR: ' + err);
+            });
+
+            sound.on('close', () => {
+                sounds.splice(sounds.findIndex(s => s.pid === sound.pid));
+            });
+
+            console.log('playing: ' + file + extension);
+            return false;
+        } catch (e) {
+            return true;
+        }
+    });
 };
 
 let sounds = [];
@@ -110,7 +134,9 @@ rtm.on('message', event => {
 
     // Handle telling bot to stop all sounds
     if (trimmedMessage === 'mute') {
-        sounds.forEach(s => { s.kill() });
+        sounds.forEach(s => {
+            s.kill()
+        });
     }
 
     // Spit out a list of valid sounds that bot can play
@@ -162,45 +188,26 @@ rtm.on('message', event => {
         switch (ttsDriver) {
             case 'win32':
                 require('winsay').speak('null', toSpeak);
-                break;
+                return;
             case 'linux':
                 exec('espeak ' + toSpeak);
-                break;
+                return;
             case 'gcptts':
-                require('./gcptts')(toSpeak);
-                break;
-            default:
-                exec('say ' + toSpeak);
+                require('./gcptts')(toSpeak)
+                    .then(res => {
+                        const data = Buffer.from(res.data.audioContent, 'base64');
+                        writeFileSync('sounds/gcptts/output.mp3', data, 'binary');
+                        playFile('sounds/gcptts/output', player, outputDevice);
+                    });
+                return;
         }
-
-        return;
     }
 
     // Default to playing a sound
 
     let soundToPlay = 'sounds/' + event.text.split(' ').splice(1).join(' ');
 
-    SUPPORTED_FORMATS.every(extension => {
-        try {
-            accessSync(soundToPlay + extension, constants.R_OK);
-            const sound = spawn(player, [outputDevice, soundToPlay + extension]);
-
-            sounds.push(sound);
-
-            sound.on('error', err => {
-                console.log('ERROR: ' + err);
-            });
-
-            sound.on('close', () => {
-                sounds.splice(sounds.findIndex(s => s.pid === sound.pid));
-            });
-
-            console.log('playing: ' + soundToPlay + extension);
-            return false;
-        } catch (e) {
-            return true;
-        }
-    });
+    playFile(soundToPlay, player, outputDevice);
 });
 
 let listening = true;
