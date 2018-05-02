@@ -8,7 +8,7 @@ RUN apt update \
 
 USER node
 
-ADD --chown=node:node package.json package-lock.json audiobot.js sounds /home/node/slack-audiobot/
+ADD --chown=node:node package.json package-lock.json audiobot.js gcptts.js sounds /home/node/slack-audiobot/
 
 RUN cd ~/slack-audiobot\
     && npm install
