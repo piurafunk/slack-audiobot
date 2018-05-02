@@ -1,3 +1,5 @@
 node_modules
 .idea/
 .env
+google-credentials.json
+test.js
