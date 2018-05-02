@@ -1,10 +1,12 @@
 require('dotenv').config();
 const { spawn } = require('child_process');
-const {RTMClient, WebClient} = require('@slack/client');
+const { RTMClient, WebClient } = require('@slack/client');
 let { lstatSync, readdirSync, accessSync, constants } = require('fs');
 let platform = require('os').platform();
 
 const SUPPORTED_FORMATS = ['.mp3', '.wav'];
+
+const ttsDriver = process.env.TTS_DRIVER; 
 
 const rtm = new RTMClient(process.env.TOKEN);
 rtm.start();
@@ -66,7 +68,7 @@ const listDirectory = (dir) => {
         }
     });
 
-    return {directories: directories, files: soundFiles};
+    return { directories: directories, files: soundFiles };
 };
 
 let sounds = [];
@@ -108,7 +110,7 @@ rtm.on('message', event => {
 
     // Handle telling bot to stop all sounds
     if (trimmedMessage === 'mute') {
-        sounds.forEach(s => {s.kill()});
+        sounds.forEach(s => { s.kill() });
     }
 
     // Spit out a list of valid sounds that bot can play
@@ -157,12 +159,18 @@ rtm.on('message', event => {
 
         let toSpeak = event.text.substring(event.text.indexOf("say") + 4);
 
-        if (platform === 'win32') {
-            require('winsay').speak("null", toSpeak);
-        } else if (platform === 'linux') {
-            exec('espeak ' + toSpeak);
-        } else {
-            exec('say ' + toSpeak);
+        switch (ttsDriver) {
+            case 'win32':
+                require('winsay').speak('null', toSpeak);
+                break;
+            case 'linux':
+                exec('espeak ' + toSpeak);
+                break;
+            case 'gcptts':
+                require('./gcptts')(toSpeak);
+                break;
+            default:
+                exec('say ' + toSpeak);
         }
 
         return;
