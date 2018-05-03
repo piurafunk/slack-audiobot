@@ -2,7 +2,6 @@ require('dotenv').config();
 const {spawn} = require('child_process');
 const {RTMClient, WebClient} = require('@slack/client');
 const {lstatSync, readdirSync, accessSync, constants, writeFileSync} = require('fs');
-const platform = require('os').platform();
 
 const SUPPORTED_FORMATS = ['.mp3', '.wav'];
 
@@ -43,9 +42,7 @@ const makeMention = (userId) => {
 
 const isDirect = (userId, messageText) => {
     let userTag = makeMention(userId);
-    return messageText &&
-        messageText.length >= userTag.length &&
-        messageText.substr(0, userTag.length) === userTag;
+    return messageText && messageText.indexOf(userTag) > -1;
 };
 
 const listDirectory = (dir) => {
@@ -71,11 +68,11 @@ const listDirectory = (dir) => {
     return {directories: directories, files: soundFiles};
 };
 
-const playFile = (file, player, outputDevice) => {
+const playFile = (file, player) => {
     SUPPORTED_FORMATS.every(extension => {
         try {
             accessSync(file + extension, constants.R_OK);
-            const sound = spawn(player, [outputDevice, file + extension]);
+            const sound = spawn(player, [file + extension]);
 
             sounds.push(sound);
 
@@ -95,10 +92,15 @@ const playFile = (file, player, outputDevice) => {
     });
 };
 
+const trimMessage = (userId, text) => {
+    const userTag = makeMention(userId);
+    return text.substr(text.indexOf(userTag) + userTag.length).trim();
+};
+
 let sounds = [];
 
 rtm.on('message', event => {
-    // Check if we should handle this message
+    // Check if we should handle this message]
     if ((event.subtype && 'bot_message' === event.subtype) ||
         (!event.subtype && event.user === rtm.activeUserId) ||
         !isDirect(rtm.activeUserId, event.text)) {
@@ -116,17 +118,17 @@ rtm.on('message', event => {
     let channel = event.channel;
 
     // Trim the message
-    let trimmedMessage = event.text.substr(makeMention(rtm.activeUserId).length).trim();
+    let trimmedMessage = trimMessage(rtm.activeUserId, event.text);
 
     // Handle telling bot to start listening
-    if (trimmedMessage === 'start' || trimmedMessage === ': start') {
+    if (trimmedMessage === 'start') {
         listening = true;
         rtm.sendMessage('I am now listening.', channel);
         return;
     }
 
     // Handle telling bot to stop listening
-    if (trimmedMessage === 'stop' || trimmedMessage === ': stop') {
+    if (trimmedMessage === 'stop') {
         listening = false;
         rtm.sendMessage('I stopped listening.', channel);
         return;
@@ -139,8 +141,22 @@ rtm.on('message', event => {
         });
     }
 
+    //spit out a list of help commands
+    if (trimmedMessage === 'help') {
+        rtm.sendMessage(`Type _<@${rtm.activeUserId}>_ and then a valid sound name to make me play that sound\n` +
+            `For a list of valid sound names, type _<@${rtm.activeUserId}> list_ (I'll listen for this even when stopped)\n` +
+            `To stop me listening for play events,  type  _<@${rtm.activeUserId}> stop_\n` +
+            `To start me listening for play events,  type  _<@${rtm.activeUserId}> start_ (I'm _on_ by default)\n` +
+            `To mute currently playing sounds, type _<@${rtm.activeUserId}> mute_`, channel);
+        return;
+    }
+
+    if (!listening) {
+        return;
+    }
+
     // Spit out a list of valid sounds that bot can play
-    if ((trimmedMessage.split(' ')[0] === 'list' || trimmedMessage === ': list') && (listening === true)) {
+    if (trimmedMessage.split(' ')[0] === 'list') {
         let contents = listDirectory(trimmedMessage.split(' ')[1] || '');
 
         let output = 'Directories:\n\t' + contents.directories.join('\n\t') + "\n" + 'Files:\n\t' + contents.files.join('\n\t');
@@ -150,35 +166,7 @@ rtm.on('message', event => {
         return;
     }
 
-    //spit out a list of help commands
-    if (trimmedMessage === 'help') {
-        rtm.sendMessage(`Type _<@${rtm.activeUserId}>_ and then a valid sound name to make me play that sound\n` +
-            `For a list of valid sound names, type _@<@${rtm.activeUserId}> list_ (I'll listen for this even when stopped)\n` +
-            `To stop me listening for play events,  type  _@<@${rtm.activeUserId}> stop_\n` +
-            `To start me listening for play events,  type  _@<@${rtm.activeUserId}> start_ (I'm _on_ by default)\n` +
-            `To mute currently playing sounds, type _<@<@${rtm.activeUserId}>> mute_`, channel);
-        return;
-    }
-
-    if (!listening) {
-        return;
-    }
-
     let player = (process.env.player || 'mplayer');
-
-    let outputDevice = '';
-    //pick output device 1 = headphones, 2 = speakers (default) - windows only
-    if (platform === 'win32') {
-        player = 'mplayer ';
-        let hasTest = event.text.indexOf("test");
-        if (hasTest > -1) {
-            //test was included, so play through device 1 (headphones)
-            outputDevice = '-ao dsound:device=1 ';
-        } else {
-            //test not included so play through device 2 (speakers)
-            outputDevice = '-ao dsound:device=2 ';
-        }
-    }
 
     //TTS - use winsay if on windows, else use say CLI for mac
     if ((event.text.indexOf("say") > -1) && (listening === true)) {
@@ -186,10 +174,10 @@ rtm.on('message', event => {
         let toSpeak = event.text.substring(event.text.indexOf("say") + 4);
 
         switch (ttsDriver) {
-            case 'win32':
+            case 'winsay':
                 require('winsay').speak('null', toSpeak);
                 return;
-            case 'linux':
+            case 'espeak':
                 exec('espeak ' + toSpeak);
                 return;
             case 'gcptts':
@@ -197,7 +185,7 @@ rtm.on('message', event => {
                     .then(res => {
                         const data = Buffer.from(res.data.audioContent, 'base64');
                         writeFileSync('sounds/gcptts/output.mp3', data, 'binary');
-                        playFile('sounds/gcptts/output', player, outputDevice);
+                        playFile('sounds/gcptts/output', player);
                     });
                 return;
         }
@@ -205,9 +193,9 @@ rtm.on('message', event => {
 
     // Default to playing a sound
 
-    let soundToPlay = 'sounds/' + event.text.split(' ').splice(1).join(' ');
+    let soundToPlay = 'sounds/' + trimmedMessage.split(' ')[0];
 
-    playFile(soundToPlay, player, outputDevice);
+    playFile(soundToPlay, player);
 });
 
 let listening = true;
