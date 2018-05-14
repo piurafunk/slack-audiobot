@@ -101,8 +101,7 @@ let sounds = [];
 
 rtm.on('message', event => {
     // Check if we should handle this message]
-    if ((event.subtype && 'bot_message' === event.subtype) ||
-        (!event.subtype && event.user === rtm.activeUserId) ||
+    if ((!event.subtype && event.user === rtm.activeUserId) ||
         !isDirect(rtm.activeUserId, event.text)) {
         return;
     }
