@@ -94,7 +94,13 @@ const playFile = (file, player) => {
 
 const trimMessage = (userId, text) => {
     const userTag = makeMention(userId);
-    return text.substr(text.indexOf(userTag) + userTag.length).trim();
+    let trimmedMessage = text.substr(text.indexOf(userTag) + userTag.length).trim();
+
+    if (trimmedMessage.slice(-1) === '.') {
+        trimmedMessage = trimmedMessage.substr(0, -1);
+    }
+
+    return trimmedMessage;
 };
 
 let sounds = [];
