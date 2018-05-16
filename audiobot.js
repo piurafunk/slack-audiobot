@@ -94,7 +94,7 @@ const playFile = (file, player) => {
 
 const trimMessage = (userId, text) => {
     const userTag = makeMention(userId);
-    let trimmedMessage = text.substr(text.indexOf(userTag) + userTag.length).trim();
+    let trimmedMessage = text.substr(text.indexOf(userTag) + userTag.length).trim().split(' ')[0];
 
     if (trimmedMessage.slice(-1) === '.') {
         trimmedMessage = trimmedMessage.substr(0, -1);
