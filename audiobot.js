@@ -41,8 +41,8 @@ const makeMention = (userId) => {
 };
 
 const isDirect = (userId, messageText) => {
-    let userTag = makeMention(userId);
-    return messageText && messageText.indexOf(userTag) > -1;
+    let userTag = makeMention(userId).slice(0, -1) + '(\\|\\w+)?>';
+    return messageText && messageText.search(userTag) > -1;
 };
 
 const listDirectory = (dir) => {
