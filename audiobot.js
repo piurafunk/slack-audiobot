@@ -103,6 +103,11 @@ const trimMessage = (userId, text) => {
     return trimmedMessage;
 };
 
+const trimBefore = (userId, text) => {
+    const userTag = makeMention(userId);
+    return text.substr(text.indexOf(userTag) + userTag.length).trim();
+};
+
 let sounds = [];
 
 rtm.on('message', event => {
@@ -161,6 +166,7 @@ rtm.on('message', event => {
 
     // Spit out a list of valid sounds that bot can play
     if (trimmedMessage.split(' ')[0] === 'list') {
+        trimmedMessage = trimBefore(rtm.activeUserId, text.event);
         let contents = listDirectory(trimmedMessage.split(' ')[1] || '');
 
         let output = 'Directories:\n\t' + contents.directories.join('\n\t') + "\n" + 'Files:\n\t' + contents.files.join('\n\t');
