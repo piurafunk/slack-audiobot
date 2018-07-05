@@ -3,3 +3,6 @@ node_modules
 .env
 google-credentials.json
 test.js
+sounds
+*.mp3
+*.wav
